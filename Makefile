@@ -34,7 +34,10 @@ test-chairmans-cluster:
 	@scripts/chairmans-cluster/cluster-test.sh
 
 profiles:
-	@jq . $$(nix-build -A profiles)
+	@jq .    $$(nix-build -A profiles)
+
+profile-names:
+	@jq keys $$(nix-build -A profiles)
 
 cluster-shell:
 	nix-shell --max-jobs 8 --cores 0 -A 'devops' --arg 'autoStartCluster' 'true'

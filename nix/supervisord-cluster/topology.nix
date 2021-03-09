@@ -1,5 +1,6 @@
 { lib
 , stateDir
+, topologyNixopsFile
 , graphviz
 , composition
 , localPortBase
@@ -11,7 +12,7 @@ let
   # };
   producers =  cfg.producers;
 
-  topology = builtins.toFile "topology.yaml" (builtins.toJSON {
+  topologyNode = builtins.toFile "topology.yaml" (builtins.toJSON {
     Producers =
       map (n: {
         addr = let a = n.addr or n; in if (nodes ? ${a}) then hostName a else a;
@@ -88,8 +89,8 @@ in
         };
 
       nixops_topology_set_pool_density(.; ${toString dense_pool_density})
-     '   "${stateDir}/topology-nixops.json" |
-  sponge "${stateDir}/topology-nixops.json"
+     '   "${topologyNixopsFile}" |
+  sponge "${topologyNixopsFile}"
 
   ## 2. Extract/generate the per-node topologies from the nixops topology:
   #
@@ -98,7 +99,7 @@ in
   #
   for i in $(seq 0 $((${toString n_hosts} - 1)))
   do args=( --argjson   i         $i
-            --slurpfile topology "${stateDir}/topology-nixops.json"
+            --slurpfile topology "${topologyNixopsFile}"
             --null-input
           )
      jq 'def loopback_node_topology_from_nixops_topology($topo; $i):
@@ -120,7 +121,7 @@ in
 
   ## 3. Generate the observer topology, which is fully connected:
   #
-  args=( --slurpfile topology "${stateDir}/topology-nixops.json"
+  args=( --slurpfile topology "${topologyNixopsFile}"
          --null-input
        )
   jq 'def loopback_observer_topology_from_nixops_topology($topo):

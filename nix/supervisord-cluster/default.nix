@@ -19,14 +19,15 @@ let
     };
   profiles = __fromJSON (__readFile profilesJSON);
 
-  profile = recursiveUpdate profiles."${profileName}" profileOverride;
+  profile = recursiveUpdate profiles."${__trace profileName profileName}" profileOverride;
   inherit (profile) era composition monetary;
 
-  profileDump = pkgs.writeText "profile-${profile.name}.json"
+  profileJSONFile = pkgs.writeText "profile-${profile.name}.json"
     (__toJSON profile);
 
+  topologyNixopsFile = "${stateDir}/topology-nixops.json";
   topology = pkgs.callPackage ./topology.nix
-    { inherit lib stateDir;
+    { inherit lib stateDir topologyNixopsFile;
       inherit (pkgs) graphviz;
       inherit (profile) composition;
       localPortBase = basePort;
@@ -50,9 +51,11 @@ let
       cacheDir stateDir
       baseEnvConfig
       basePort
-      profile;
+      profile
+      profileJSONFile;
       path = makeBinPath
         [ bech32 pkgs.jq pkgs.gnused pkgs.coreutils pkgs.bash pkgs.moreutils ];
+      topologyNixopsFile = "${stateDir}/topology-nixops.json";
     };
 
   node-setups = pkgs.callPackage ./node-setups.nix
@@ -85,7 +88,16 @@ let
 
     if [ -f ${stateDir}/supervisord.pid ]
     then echo "Cluster already running. Please run 'stop-cluster' first!"
-         exit 1; fi
+         exit 1
+    else cat <<EOF
+Starting cluster:
+  - profile:      ${profile.name}
+  - profile JSON: ${profileJSONFile}
+  - state dir:    ${stateDir}
+  - topology:     ${topologyNixopsFile}
+
+EOF
+    fi
 
     rm -rf ${stateDir}
 
@@ -95,7 +107,7 @@ let
 
     ${mkGenesisBash}
 
-    echo "Profile '${profile.name}' dump in: ${profileDump}"
+    echo "Profile '${profile.name}' dump in: ${profileJSONFile}"
 
     ${__concatStringsSep "\n"
       (flip mapAttrsToList node-setups.nodeSetups

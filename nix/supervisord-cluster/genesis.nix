@@ -9,6 +9,9 @@
 , basePort
 ##
 , profile
+, profileJSONFile
+## As derived from profile:
+, topologyNixopsFile
 }:
 
 with profile;
@@ -64,10 +67,126 @@ let
 
   genesisCacheDir = "${cacheDir}/genesis";
 
+  shelleyGenesisCommon =
+    path:
+    ''
+    __KEY_ROOT=
+    key_depl() {
+        local type=$1 kind=$2 id=$3
+        case "$kind" in
+                bulk )     suffix='.creds';;
+                cert )     suffix='.cert';;
+                count )    suffix='.counter';;
+                none )     suffix=;;
+                sig )      suffix='.skey';;
+                ver )      suffix='.vkey';;
+                * )        fail "key_depl: unknown key kind: '$kind'";; esac
+        case "$type" in
+                bulk )     stem=node-keys/bulk''${id};;
+                cold )     stem=node-keys/cold/operator''${id};;
+                opcert )   stem=node-keys/node''${id}.opcert;;
+                KES )      stem=node-keys/node-kes''${id};;
+                VRF )      stem=node-keys/node-vrf''${id};;
+                * )        fail "key_depl: unknown key type: '$type'";; esac
+        echo "$__KEY_ROOT"/$stem$suffix
+    }
+    key_genesis() {
+        local type=$1 kind=$2 id=$3
+        case "$kind" in
+                bulk )     suffix='.creds';;
+                cert )     suffix='.cert';;
+                count )    suffix='.counter';;
+                none )     suffix=;;
+                sig )      suffix='.skey';;
+                ver )      suffix='.vkey';;
+                * )        fail "key_genesis: unknown key kind: '$kind'";; esac
+        case "$type" in
+                bulk )     stem=pools/bulk''${id};;
+                cold )     stem=pools/cold''${id};;
+                opcert )   stem=pools/opcert''${id};;
+                KES )      stem=pools/kes''${id};;
+                VRF )      stem=pools/vrf''${id};;
+                deleg )    stem=delegate-keys/delegate''${id};;
+                delegCert )stem=delegate-keys/opcert''${id};;
+                delegKES ) stem=delegate-keys/delegate''${id}.kes;;
+                delegVRF ) stem=delegate-keys/delegate''${id}.vrf;;
+                * )        fail "key_genesis: unknown key type: '$type'";; esac
+        echo "$__KEY_ROOT"/$stem$suffix
+    }
+    genesis_remap_key_names() {
+        local ids_pool_map=$1
+        local ids
+
+        set -e
+
+        __KEY_ROOT=${path}
+
+        ids=($(jq 'keys
+                  | join(" ")
+                  ' -cr <<<$ids_pool_map))
+        local bid=1 pid=1 did=1 ## (B)FT, (P)ool, (D)ense pool
+        for id in ''${ids[*]}
+        do
+            mkdir -p "$target_dir"/node-keys/cold
+
+            #### cold keys (do not copy to production system)
+            if   jqtest ".genesis.dense_pool_density > 1" ${profileJSONFile} &&
+                 jqtest ".[\"$id\"]  > 1" <<<$ids_pool_map
+            then ## Dense/bulk pool
+               oprint "genesis:  bulk pool $did -> node-$id"
+               cp -f $(key_genesis bulk      bulk $did) $(key_depl bulk   bulk $id)
+               did=$((did + 1))
+            elif jqtest ".[\"$id\"] != 0" <<<$ids_pool_map
+            then ## Singular pool
+               oprint "genesis:  pool $pid -> node-$id"
+               cp -f $(key_genesis cold       sig $pid) $(key_depl cold    sig $id)
+               cp -f $(key_genesis cold       ver $pid) $(key_depl cold    ver $id)
+               cp -f $(key_genesis opcert    cert $pid) $(key_depl opcert none $id)
+               cp -f $(key_genesis opcert   count $pid) $(key_depl cold  count $id)
+               cp -f $(key_genesis KES        sig $pid) $(key_depl KES     sig $id)
+               cp -f $(key_genesis KES        ver $pid) $(key_depl KES     ver $id)
+               cp -f $(key_genesis VRF        sig $pid) $(key_depl VRF     sig $id)
+               cp -f $(key_genesis VRF        ver $pid) $(key_depl VRF     ver $id)
+               pid=$((pid + 1))
+            else ## BFT node
+               oprint "genesis:  BFT $bid -> node-$id"
+               cp -f $(key_genesis deleg      sig $bid) $(key_depl cold    sig $id)
+               cp -f $(key_genesis deleg      ver $bid) $(key_depl cold    ver $id)
+               cp -f $(key_genesis delegCert cert $bid) $(key_depl opcert none $id)
+               cp -f $(key_genesis deleg    count $bid) $(key_depl cold  count $id)
+               cp -f $(key_genesis delegKES   sig $bid) $(key_depl KES     sig $id)
+               cp -f $(key_genesis delegKES   ver $bid) $(key_depl KES     ver $id)
+               cp -f $(key_genesis delegVRF   sig $bid) $(key_depl VRF     sig $id)
+               cp -f $(key_genesis delegVRF   ver $bid) $(key_depl VRF     ver $id)
+               bid=$((bid + 1))
+            fi
+        done
+    }
+
+    topology_id_pool_density_map() {
+            local topology_file=''${1:-}
+
+            nix-instantiate --strict --eval \
+              -E '__toJSON (__listToAttrs
+                            (map (x: { name = toString x.nodeId;
+                                      value = if (x.pools or 0) == null then 0 else x.pools or 0; })
+                                 (__fromJSON (__readFile '"''${topology_file}"')).coreNodes))' |
+              sed 's_\\__g; s_^"__; s_"$__'
+    }
+
+    ids_pool_map=$(topology_id_pool_density_map "${topologyNixopsFile}")
+    echo "genesis: id-pool map:  $ids_pool_map"
+
+    cli genesis create --genesis-dir ${path}/ \
+        ${toString cli_args.createSpec}
+    '';
+
   shelleyGenesis =
     p: ## profile
     ''
     ## Determine the genesis cache entry:
+
+    profile_json='${__toJSON p}'
 
     genesis_cache_params=$(jq '.genesis * .composition |
                               del(.active_slots_coeff) |
@@ -81,10 +200,10 @@ let
                               del(.genesis_future_offset) |
                               del(.byron) |
                               del(.locations)
-                             ' --sort-keys <<<'${__toJSON p}')
+                             ' --sort-keys <<<$profile_json)
 
     genesis_params_hash=$(echo "$genesis_cache_params" | sha1sum | cut -c-7)
-    genesis_cache_id=$(jq <<<'${__toJSON p}' \
+    genesis_cache_id=$(jq <<<$profile_json \
        '"k\(.composition.n_pools)-d\(.composition.dense_pool_density)-\(.genesis.delegators / 1000)kD-\(.genesis.utxo / 1000)kU-\($params_hash)"
        ' --arg params_hash "$genesis_params_hash" --raw-output)
     genesis_cache_path="${genesisCacheDir}/$genesis_cache_id"
@@ -100,14 +219,13 @@ let
     then echo "generating genesis due to cache miss:  $genesis_cache_id @$genesis_cache_path"
          mkdir -p "$genesis_cache_path"
 
-         ${shelleyGenesisSpec                 "$genesis_cache_path"}
-         ${shelleyGenesisVerbatim             "$genesis_cache_path"}
+         ${shelleyGenesisCommon   "$genesis_cache_path"}
+         ${shelleyGenesisVerbatim "$genesis_cache_path"}
 
          ${if genesis.single_shot
            then
              ''
-             echo "Single-shot genesis not supported yet."
-             exit 1
+             ${shelleyGenesisSingleshot "$genesis_cache_path"}
              ''
            else if genesis.utxo > 0
                    || genesis.delegators > composition.n_pools
@@ -153,16 +271,27 @@ let
   shelleyGenesisSpec =
     dir:
     ''
-    cli genesis create --genesis-dir ${dir}/ ${toString cli_args.createSpec}
     '';
 
   shelleyGenesisVerbatim =
     dir:
     ''
-    jq -r --argjson genesisVerb '${__toJSON genesis.verbatim}' \
-           '. * $genesisVerb' \
-           ${dir}/genesis.spec.json |
+    jq -r --argjson genesisVerb '${__toJSON genesis.verbatim}' '
+        . * $genesisVerb
+        '  ${dir}/genesis.spec.json |
     sponge ${dir}/genesis.spec.json
+    '';
+
+  shelleyGenesisSingleshot =
+    dir:
+    ''
+    params=(--genesis-dir      "${dir}"
+            ${toString cli_args.createFinalBulk}
+           )
+    ## update genesis from template
+    cli genesis create-staked "''${params[@]}"
+
+    genesis_remap_key_names "$ids_pool_map"
     '';
 
   shelleyGenesisIncremental =
