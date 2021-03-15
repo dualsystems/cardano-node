@@ -40,7 +40,13 @@ profile-names:
 	@jq keys $$(nix-build -A profiles)
 
 cluster-shell:
-	nix-shell --max-jobs 8 --cores 0 -A 'devops' --arg 'autoStartCluster' 'true'
+	nix-shell --max-jobs 8 --cores 0 --command 'start-cluster; return' --argstr clusterProfile 'default-mary' --command 'start-cluster; return'
+
+large-state-cluster-shell:
+	nix-shell --max-jobs 8 --cores 0  --command 'start-cluster; return' --argstr clusterProfile 'k2-10ep-2000kU-500kD-nobs-mary' --command 'start-cluster; return'
+
+large-state-cluster-shell-trace:
+	nix-shell --max-jobs 8 --cores 0  --command 'start-cluster; return' --argstr clusterProfile 'k2-10ep-2000kU-500kD-nobs-mary' --command 'start-cluster --trace; return'
 
 cabal-setup setup:
 	./scripts/cabal-inside-nix-shell.sh

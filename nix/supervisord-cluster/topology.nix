@@ -44,7 +44,8 @@ in
              inherit i;
            })
        ++
-     (flip genList 1)
+     (flip genList (if composition.with_observer
+                    then 1 else 0))
      (n: let i = n + composition.n_bft_hosts + composition.n_pool_hosts; in
          lib.nameValuePair "node-${toString i}"
            { name = "node-${toString i}";

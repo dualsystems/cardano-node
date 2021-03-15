@@ -3,7 +3,7 @@
 , bech32
 , basePort ? 30000
 , stateDir ? "./state-cluster"
-, cacheDir ? "./.cache"
+, cacheDir ? "~/.cache"
 , extraSupervisorConfig ? {}
 , useCabalRun ? false
 ##
@@ -113,14 +113,14 @@ EOF
       (flip mapAttrsToList node-setups.nodeSetups
         (name: nodeSetup:
           ''
-          cp ${__toFile "${name}.json"
-            (__toJSON nodeSetup.nodeConfig)} \
+          jq . ${__toFile "${name}.json"
+            (__toJSON nodeSetup.nodeConfig)} > \
              ${stateDir}/${name}.config.json
 
-          cp ${__toFile "${name}.json"
+          jq . ${__toFile "${name}.json"
                 (__toJSON
                    (removeAttrs nodeSetup.envConfig
-                      ["override" "overrideDerivation"]))} \
+                      ["override" "overrideDerivation"]))} > \
              ${stateDir}/${name}.env.json
           ''
         ))}
@@ -129,22 +129,28 @@ EOF
         --config ${__trace "supervisorConfig: ${supervisorConf} "
                    supervisorConf} $@
 
+    ## Wait for socket activation:
+    #
     if test ! -v "CARDANO_NODE_SOCKET_PATH"
     then export CARDANO_NODE_SOCKET_PATH=$PWD/${stateDir}/node-0.socket; fi
-
     while [ ! -S $CARDANO_NODE_SOCKET_PATH ]; do echo "Waiting 5 seconds for bft node to start"; sleep 5; done
-    echo "Transfering genesis funds to pool owners, register pools and delegations"
-    cli transaction submit \
-      --cardano-mode \
-      --tx-file ${stateDir}/shelley/transfer-register-delegate-tx.tx \
-      --testnet-magic ${toString profile.genesis.network_magic}
-    sleep 5
 
     echo 'Recording node pids..'
     ${pkgs.psmisc}/bin/pstree -Ap $(cat ${stateDir}/supervisord.pid) |
     grep 'cabal.*cardano-node' |
     sed -e 's/^.*-+-cardano-node(\([0-9]*\))-.*$/\1/' \
       > ${stateDir}/cardano-node.pids
+
+    ${optionalString (!profile.genesis.single_shot)
+     ''
+      echo "Transfering genesis funds to pool owners, register pools and delegations"
+      cli transaction submit \
+        --cardano-mode \
+        --tx-file ${stateDir}/shelley/transfer-register-delegate-tx.tx \
+        --testnet-magic ${toString profile.genesis.network_magic}
+      sleep 5
+     ''}
+
     echo 'Cluster started. Run `stop-cluster` to stop'
   '';
   stop = pkgs.writeScriptBin "stop-cluster" ''
