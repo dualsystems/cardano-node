@@ -40,23 +40,20 @@ friendlyTxBody :: Api.TxBody era -> Value
 friendlyTxBody = \case
   ByronTxBody tx ->
     case friendlyTxBodyByron tx of
-      Object obj -> Object $ HashMap.insert "era" "Byron" obj
+      Object obj -> objectWithEra "Byron" obj
       value      -> object ["era" .= String "Byron", "transaction" .= value]
   ShelleyTxBody ShelleyBasedEraShelley body aux ->
-    Object $
-    HashMap.insert "era" "Shelley" $
-    HashMap.insert "auxiliary data" (maybe Null (toJSON . textShow) aux) $
-    friendlyTxBodyShelley body
+    objectWithEra "Shelley" $ addAuxData aux $ friendlyTxBodyShelley body
   ShelleyTxBody ShelleyBasedEraAllegra body aux ->
-    Object $
-    HashMap.insert "era" "Allegra" $
-    HashMap.insert "auxiliary data" (maybe Null (toJSON . textShow) aux) $
-    friendlyTxBodyAllegra body
+    objectWithEra "Allegra" $ addAuxData aux $ friendlyTxBodyAllegra body
   ShelleyTxBody ShelleyBasedEraMary body aux ->
-    Object $
-    HashMap.insert "era" "Mary" $
-    HashMap.insert "auxiliary data" (maybe Null (toJSON . textShow) aux) $
-    friendlyTxBodyMary body
+    objectWithEra "Mary" $ addAuxData aux $ friendlyTxBodyMary body
+
+objectWithEra :: Text -> Object -> Value
+objectWithEra era = Object . HashMap.insert "era" (String era)
+
+addAuxData :: Show a => Maybe a -> Object -> Object
+addAuxData = HashMap.insert "auxiliary data" . maybe Null (toJSON . textShow)
 
 friendlyTxBodyByron :: Annotated Byron.Tx ByteString -> Value
 friendlyTxBodyByron = toJSON
