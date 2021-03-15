@@ -25,7 +25,7 @@ import qualified Cardano.Chain.UTxO as Byron
 import           Cardano.Ledger.Shelley as Ledger (ShelleyEra)
 import           Cardano.Ledger.ShelleyMA (MaryOrAllegra (Allegra, Mary), ShelleyMAEra)
 import qualified Cardano.Ledger.ShelleyMA.TxBody as ShelleyMA
-import           Data.Aeson as JSON (Object, Value (..), object, toJSON, (.=))
+import           Data.Aeson (Object, Value (..), object, toJSON, (.=))
 import qualified Data.HashMap.Strict as HashMap
 import           Data.Yaml.Pretty (defConfig, encodePretty, setConfCompare)
 import           Ouroboros.Consensus.Shelley.Protocol.Crypto (StandardCrypto)
