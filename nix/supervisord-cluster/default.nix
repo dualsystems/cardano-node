@@ -13,6 +13,9 @@
 }:
 with lib;
 let
+  path = makeBinPath
+    [ bech32 pkgs.jq pkgs.gnused pkgs.coreutils pkgs.bash pkgs.moreutils ];
+
   profilesJSON = pkgs.callPackage ./profiles.nix
     { inherit
       lib;
@@ -53,8 +56,6 @@ let
       basePort
       profile
       profileJSONFile;
-      path = makeBinPath
-        [ bech32 pkgs.jq pkgs.gnused pkgs.coreutils pkgs.bash pkgs.moreutils ];
       topologyNixopsFile = "${stateDir}/topology-nixops.json";
     };
 
@@ -101,6 +102,7 @@ EOF
 
     rm -rf ${stateDir}
 
+    PATH=$PATH:${path}
     ${defCardanoExesBash}
 
     ${topology.mkTopologyBash}

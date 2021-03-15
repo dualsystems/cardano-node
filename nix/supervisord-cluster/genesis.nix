@@ -2,7 +2,6 @@
 , runCommand
 , writeText
 ##
-, path
 , cacheDir
 , stateDir
 , baseEnvConfig
@@ -534,7 +533,6 @@ let
     '';
 in
 ''
-    PATH=$PATH:${path}
     mkdir -p ${genesisCacheDir}
 
     ${decideSystemStart}
