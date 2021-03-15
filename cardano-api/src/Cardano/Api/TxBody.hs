@@ -291,20 +291,20 @@ instance IsCardanoEra era => ToJSON (TxOut era) where
       ShelleyAddressInEra sbe ->
         case sbe of
           ShelleyBasedEraShelley ->
-            let hexAddr = serialiseToBech32 addr
-            in object [ "address" .= hexAddr
-                      , "value" .= toJSON val
-                      ]
+            object
+              [ "address" .= serialiseToBech32 addr
+              , "value" .= toJSON val
+              ]
           ShelleyBasedEraAllegra ->
-            let hexAddr = serialiseToBech32 addr
-            in object [ "address" .= hexAddr
-                      , "value" .= toJSON val
-                      ]
+            object
+              [ "address" .= serialiseToBech32 addr
+              , "value" .= toJSON val
+              ]
           ShelleyBasedEraMary ->
-            let hexAddr = serialiseToBech32 addr
-            in object [ "address" .= hexAddr
-                      , "value" .= toJSON val
-                      ]
+            object
+              [ "address" .= serialiseToBech32 addr
+              , "value" .= toJSON val
+              ]
 
 
 
