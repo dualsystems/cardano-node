@@ -45,17 +45,17 @@ friendlyTxBody = \case
   ShelleyTxBody ShelleyBasedEraShelley body aux ->
     Object $
     HashMap.insert "era" "Shelley" $
-    HashMap.insert "auxiliary data" (toJSON $ textShow aux) $
+    HashMap.insert "auxiliary data" (maybe Null (toJSON . textShow) aux) $
     friendlyTxBodyShelley body
   ShelleyTxBody ShelleyBasedEraAllegra body aux ->
     Object $
     HashMap.insert "era" "Allegra" $
-    HashMap.insert "auxiliary data" (toJSON $ textShow aux) $
+    HashMap.insert "auxiliary data" (maybe Null (toJSON . textShow) aux) $
     friendlyTxBodyAllegra body
   ShelleyTxBody ShelleyBasedEraMary body aux ->
     Object $
     HashMap.insert "era" "Mary" $
-    HashMap.insert "auxiliary data" (toJSON $ textShow aux) $
+    HashMap.insert "auxiliary data" (maybe Null (toJSON . textShow) aux) $
     friendlyTxBodyMary body
 
 friendlyTxBodyByron :: Annotated Byron.Tx ByteString -> Value
