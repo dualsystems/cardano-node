@@ -59,26 +59,16 @@ friendlyTxBodyByron = toJSON
 
 friendlyTxBodyShelley
   :: Shelley.TxBody (Ledger.ShelleyEra StandardCrypto) -> Object
-friendlyTxBodyShelley
-  Shelley.TxBody
-    { _inputs
-    , _outputs
-    , _certs
-    , _wdrls = Shelley.Wdrl withdrawals
-    , _txfee
-    , _ttl
-    , _txUpdate
-    , _mdHash
-    } =
+friendlyTxBodyShelley body =
   HashMap.fromList
-    [ "inputs" .= _inputs
-    , "outputs" .= fmap friendlyTxOutShelley _outputs
-    , "certificates" .= fmap textShow _certs
-    , "withdrawals" .= withdrawals
-    , "fee" .= _txfee
-    , "time to live" .= _ttl
-    , "update" .= fmap textShow _txUpdate
-    , "metadata hash" .= fmap textShow _mdHash
+    [ "inputs" .= Shelley._inputs body
+    , "outputs" .= fmap friendlyTxOutShelley (Shelley._outputs body)
+    , "certificates" .= fmap textShow (Shelley._certs body)
+    , "withdrawals" .= Shelley.unWdrl (Shelley._wdrls body)
+    , "fee" .= Shelley._txfee body
+    , "time to live" .= Shelley._ttl body
+    , "update" .= fmap textShow (Shelley._txUpdate body)
+    , "metadata hash" .= fmap textShow (Shelley._mdHash body)
     ]
 
 friendlyTxBodyAllegra
