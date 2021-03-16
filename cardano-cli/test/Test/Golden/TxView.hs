@@ -9,6 +9,8 @@ import           Hedgehog.Extras.Test.Base (moduleWorkspace, propertyOnce)
 
 import           Test.OptParse (execCardanoCLI, noteTempFile)
 
+{- HLINT ignore "Use camelCase" -}
+
 txViewTests :: IO Bool
 txViewTests =
   checkSequential $

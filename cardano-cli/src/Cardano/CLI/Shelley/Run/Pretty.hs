@@ -10,8 +10,7 @@
 -- | User-friendly pretty-printing for textual user interfaces (TUI)
 module Cardano.CLI.Shelley.Run.Pretty (friendlyTxBodyBS) where
 
-import           Cardano.Prelude hiding (undefined)
-import           Prelude (error)
+import           Cardano.Prelude
 
 import           Cardano.Api as Api (AddressInEra (..),
                    AddressTypeInEra (ByronAddressInAnyEra, ShelleyAddressInEra),
@@ -164,7 +163,7 @@ friendlyAddress addr =
     addressBech32 =
       case fromShelleyAddr @Api.ShelleyEra addr of
         AddressInEra (ShelleyAddressInEra _) a -> serialiseToBech32 a
-        AddressInEra ByronAddressInAnyEra _ -> error "expected Shelley address"
+        AddressInEra ByronAddressInAnyEra _ -> panic "expected Shelley address"
 
 friendlyTxOutAllegra :: TxOut (ShelleyMAEra 'Allegra StandardCrypto) -> Value
 friendlyTxOutAllegra = toJSON
